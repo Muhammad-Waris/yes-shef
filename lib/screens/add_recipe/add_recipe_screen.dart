@@ -1,64 +1,74 @@
 import 'package:flutter/material.dart';
-import 'url_import_screen.dart';
+import 'package:yes_chef/screens/add_recipe/ocr_scan.dart';
 import 'manual_entry_screen.dart';
+import 'url_import_screen.dart';
 
 class AddRecipeScreen extends StatelessWidget {
   const AddRecipeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Add Recipe'),
-        backgroundColor: Colors.transparent,
         elevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Hero Section
+            // 🌈 Hero Section
             Container(
-              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
+                  colors: [
+                    theme.colorScheme.primary.withValues(alpha: 0.85),
+                    theme.colorScheme.primaryContainer.withValues(alpha: 0.7),
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Theme.of(context).colorScheme.primaryContainer,
-                    Theme.of(context)
-                        .colorScheme
-                        .primaryContainer
-                        .withOpacity(0.7),
-                  ],
                 ),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
+              padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
               child: Column(
                 children: [
                   Icon(
                     Icons.restaurant_menu,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    size: 68,
+                    color: theme.colorScheme.onPrimaryContainer,
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'How would you like to add your recipe?',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color:
-                              Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(
-                    'Choose from multiple import options below',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
+                    'Choose from multiple import or entry options below',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer.withValues(
+                        alpha: 0.9,
+                      ),
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -67,65 +77,71 @@ class AddRecipeScreen extends StatelessWidget {
 
             const SizedBox(height: 32),
 
-            // Import Options
+            // 🔗 Import from URL
             _buildImportOption(
               context,
               icon: Icons.link,
               title: 'Import from URL',
               subtitle: 'Scrape recipes from websites automatically',
-              description:
-                  'Paste a recipe URL to extract ingredients, instructions, and photos',
               color: Colors.blue,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const UrlImportScreen()),
+                  builder: (context) => const UrlImportScreen(),
+                ),
               ),
             ),
 
             const SizedBox(height: 16),
 
+            // 📷 Scan Recipe (OCR)
             _buildImportOption(
               context,
-              icon: Icons.camera_alt,
+              icon: Icons.camera_alt_outlined,
               title: 'Scan Recipe (OCR)',
-              subtitle: 'Convert photos to editable text',
-              description:
-                  'Take a photo or upload from gallery to extract recipe text',
+              subtitle: 'Extract recipe text from photos',
               color: Colors.green,
-            onTap: () {
-              
-            },
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const OCRScanScreen()),
+              ),
             ),
 
             const SizedBox(height: 16),
 
+            // ✍️ Enter Manually
             _buildImportOption(
               context,
-              icon: Icons.edit,
+              icon: Icons.edit_note_rounded,
               title: 'Enter Manually',
-              subtitle: 'Type your recipe from scratch',
-              description: 'Full recipe entry form with automatic tagging',
+              subtitle: 'Type or paste your recipe by hand',
               color: Colors.purple,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const ManualEntryScreen()),
+                  builder: (context) => const ManualEntryScreen(),
+                ),
               ),
             ),
 
             const SizedBox(height: 32),
 
-            // Quick Tips
+            // 💡 Quick Tips Section
             Container(
-              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .surfaceVariant
-                    .withOpacity(0.5),
-                borderRadius: BorderRadius.circular(12),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.6,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
+              padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -133,62 +149,70 @@ class AddRecipeScreen extends StatelessWidget {
                     children: [
                       Icon(
                         Icons.lightbulb_outline,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: theme.colorScheme.primary,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         'Quick Tips',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _buildTip('URL Import works with most recipe websites'),
-                  _buildTip('OCR works best with clear, well-lit photos'),
-                  _buildTip('All recipes get automatic tag suggestions'),
-                  _buildTip('You can edit everything before saving'),
+                  _buildTip('URL import works with most modern recipe sites.'),
+                  _buildTip(
+                    'OCR is best with well-lit, straight photos of recipes.',
+                  ),
+                  _buildTip(
+                    'All recipes are auto-tagged with meal and diet types.',
+                  ),
+                  _buildTip(
+                    'You can preview, edit, and organize before saving.',
+                  ),
                 ],
               ),
             ),
+
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
 
+  // 🌟 Custom reusable import option widget
   Widget _buildImportOption(
     BuildContext context, {
     required IconData icon,
     required String title,
     required String subtitle,
-    required String description,
     required Color color,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+
     return Card(
-      elevation: 2,
+      elevation: 3,
+      shadowColor: color.withValues(alpha: 0.2),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(18),
           child: Row(
             children: [
               Container(
-                width: 60,
-                height: 60,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  size: 30,
-                  color: color,
-                ),
+                child: Icon(icon, size: 28, color: color),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -197,33 +221,26 @@ class AddRecipeScreen extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: color,
-                            fontWeight: FontWeight.w500,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      description,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
               ),
               Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                Icons.arrow_forward_ios_rounded,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -234,11 +251,17 @@ class AddRecipeScreen extends StatelessWidget {
 
   Widget _buildTip(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 14, height: 1.3),
+            ),
+          ),
         ],
       ),
     );

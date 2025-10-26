@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:share_plus/share_plus.dart';
 
 class GroceryListScreen extends StatefulWidget {
   const GroceryListScreen({super.key});
@@ -9,91 +11,84 @@ class GroceryListScreen extends StatefulWidget {
 
 class _GroceryListScreenState extends State<GroceryListScreen> {
   bool _shoppingMode = false;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Mock grocery data with complete pantry/to-buy logic
   final Map<String, List<Map<String, dynamic>>> _groceryItems = {
-    'Pantry Items': [
-      {
-        'id': '1',
-        'name': 'Salt',
-        'quantity': '1 container',
-        'aisle': 'Spices',
-        'checked': false,
-        'notes': 'Sea salt preferred',
-        'excess': null,
-      },
-      {
-        'id': '2',
-        'name': 'All-Purpose Flour',
-        'quantity': '5 lb bag',
-        'aisle': 'Baking',
-        'checked': true,
-        'notes': '',
-        'excess': '2 cups excess',
-      },
-      {
-        'id': '3',
-        'name': 'Olive Oil',
-        'quantity': '1 bottle (500ml)',
-        'aisle': 'Oils',
-        'checked': false,
-        'notes': 'Extra virgin',
-        'excess': null,
-      },
-    ],
-    'To-Buy Items': [
-      {
-        'id': '4',
-        'name': 'Chicken Breast',
-        'quantity': '2 lbs',
-        'aisle': 'Meat',
-        'checked': false,
-        'notes': 'Organic preferred',
-        'excess': null,
-      },
-      {
-        'id': '5',
-        'name': 'Roma Tomatoes',
-        'quantity': '6 large (need 4)',
-        'aisle': 'Produce',
-        'checked': false,
-        'notes': 'Ripe but firm',
-        'excess': '2 tomatoes excess',
-      },
-      {
-        'id': '6',
-        'name': 'Whole Milk',
-        'quantity': '1 gallon',
-        'aisle': 'Dairy',
-        'checked': true,
-        'notes': '',
-        'excess': null,
-      },
-      {
-        'id': '7',
-        'name': 'Sourdough Bread',
-        'quantity': '1 loaf',
-        'aisle': 'Bakery',
-        'checked': false,
-        'notes': 'Sliced',
-        'excess': null,
-      },
-    ],
+    'Pantry Items': [],
+    'To-Buy Items': [],
   };
 
   @override
+  void initState() {
+    super.initState();
+    _loadFromFirestore();
+  }
+
+  /// 🔄 Load all grocery items from Firestore
+  Future<void> _loadFromFirestore() async {
+    final snapshot = await _firestore.collection('grocery_items').get();
+    final items = snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+
+    setState(() {
+      _groceryItems['Pantry Items'] =
+          items.where((i) => i['category'] == 'Pantry Items').toList();
+      _groceryItems['To-Buy Items'] =
+          items.where((i) => i['category'] == 'To-Buy Items').toList();
+    });
+  }
+
+  /// 💾 Save or update a grocery item
+  Future<void> _saveItem(Map<String, dynamic> item) async {
+    if (item['id'] == null || item['id'].toString().isEmpty) {
+      final docRef = await _firestore.collection('grocery_items').add(item);
+      item['id'] = docRef.id;
+    } else {
+      await _firestore.collection('grocery_items').doc(item['id']).set(item);
+    }
+  }
+
+  /// ❌ Delete grocery item
+  Future<void> _deleteItem(Map<String, dynamic> item, String category) async {
+    if (item['id'] != null) {
+      await _firestore.collection('grocery_items').doc(item['id']).delete();
+    }
+    setState(() => _groceryItems[category]?.remove(item));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('${item['name']} deleted')));
+  }
+
+  /// ✅ Move grocery item between categories
+  Future<void> _moveItem(Map<String, dynamic> item, String category) async {
+    final target = category == 'Pantry Items' ? 'To-Buy Items' : 'Pantry Items';
+    setState(() {
+      _groceryItems[category]?.remove(item);
+      item['category'] = target;
+      _groceryItems[target]?.add(item);
+    });
+    await _saveItem(item);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Moved to $target')));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Grocery Lists'),
+        title: const Text('Grocery List'),
         actions: [
           IconButton(
-            icon: Icon(_shoppingMode ? Icons.list : Icons.shopping_cart),
-            onPressed: () {
-              setState(() {
-                _shoppingMode = !_shoppingMode;
-              });
-            },
+            icon: Icon(
+              _shoppingMode ? Icons.list_alt : Icons.shopping_cart,
+              color: Colors.white,
+            ),
+            onPressed: () => setState(() => _shoppingMode = !_shoppingMode),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Reload from Firebase',
+            onPressed: _loadFromFirestore,
           ),
           PopupMenuButton<String>(
             onSelected: _handleMenuAction,
@@ -109,16 +104,16 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
               const PopupMenuItem(
                 value: 'inventory',
                 child: ListTile(
-                  leading: Icon(Icons.inventory),
-                  title: Text('Check Pantry'),
+                  leading: Icon(Icons.inventory_2_outlined),
+                  title: Text('View Pantry Summary'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
               const PopupMenuItem(
                 value: 'clear',
                 child: ListTile(
-                  leading: Icon(Icons.clear_all),
-                  title: Text('Clear Checked'),
+                  leading: Icon(Icons.cleaning_services_outlined),
+                  title: Text('Clear Checked Items'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
@@ -126,7 +121,7 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
                 value: 'share',
                 child: ListTile(
                   leading: Icon(Icons.share),
-                  title: Text('Share List'),
+                  title: Text('Share Grocery List'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
@@ -136,296 +131,188 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
       ),
       body: Column(
         children: [
-          // Shopping Mode Header
-          if (_shoppingMode)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              color: Theme.of(context).colorScheme.primaryContainer,
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.shopping_cart,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        size: 28,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Shopping Mode',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onPrimaryContainer,
-                            ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          '${_getCheckedCount()}/${_getTotalCount()} items',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  LinearProgressIndicator(
-                    value: _getTotalCount() > 0
-                        ? _getCheckedCount() / _getTotalCount()
-                        : 0,
-                    backgroundColor:
-                        Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // Grocery Lists
+          if (_shoppingMode) _buildProgressBar(),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: _groceryItems.entries.map((category) {
-                return _buildCategorySection(category.key, category.value);
-              }).toList(),
-            ),
+            child: _groceryItems.values.every((list) => list.isEmpty)
+                ? _buildEmptyState()
+                : ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: _groceryItems.entries
+                        .map((entry) =>
+                            _buildCategorySection(entry.key, entry.value))
+                        .toList(),
+                  ),
           ),
         ],
       ),
-      // FIXED: Add unique hero tag to avoid conflicts
       floatingActionButton: FloatingActionButton(
-        heroTag: "grocery_fab", // Fixed: Add unique hero tag
-        onPressed: () => _showAddItemDialog(),
+        heroTag: 'grocery_fab',
+        onPressed: _showAddItemDialog,
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildCategorySection(
-      String category, List<Map<String, dynamic>> items) {
-    final checkedCount = items.where((item) => item['checked']).length;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Category Header
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Row(
+  // 🛒 Shopping progress
+  Widget _buildProgressBar() {
+    final total = _getTotalCount();
+    final checked = _getCheckedCount();
+    final progress = total == 0 ? 0.0 : checked / total;
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      color: theme.colorScheme.primaryContainer,
+      child: Column(
+        children: [
+          Row(
             children: [
-              Icon(
-                category == 'Pantry Items' ? Icons.home : Icons.shopping_basket,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+              const Icon(Icons.shopping_basket_outlined),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  category,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  'Shopping Mode',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
                 ),
               ),
-              if (_shoppingMode)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: checkedCount == items.length
-                        ? Colors.green
-                        : Theme.of(context).colorScheme.secondaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '$checkedCount/${items.length}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: checkedCount == items.length
-                          ? Colors.white
-                          : Theme.of(context).colorScheme.onSecondaryContainer,
-                    ),
-                  ),
-                ),
+              Text('$checked / $total',
+                  style: TextStyle(color: theme.colorScheme.primary)),
             ],
           ),
-        ),
-
-        // Category Description
-        if (category == 'Pantry Items')
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(
-              'Items typically found in inside aisles (spices, oils, flour, etc.)',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontStyle: FontStyle.italic,
-                  ),
-            ),
+          const SizedBox(height: 6),
+          LinearProgressIndicator(
+            value: progress,
+            backgroundColor: theme.colorScheme.primary.withOpacity(0.2),
+            valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
           ),
-
-        // Items
-        ...items.map((item) => _buildGroceryItem(item, category)),
-
-        const SizedBox(height: 24),
-      ],
-    );
-  }
-
-  Widget _buildGroceryItem(Map<String, dynamic> item, String category) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: item['checked'] && _shoppingMode ? 1 : 2,
-      child: ListTile(
-        leading: _shoppingMode
-            ? Checkbox(
-                value: item['checked'],
-                onChanged: (value) {
-                  setState(() {
-                    item['checked'] = value ?? false;
-                  });
-                  if (value == true) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('✓ ${item['name']} added to cart'),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                  }
-                },
-              )
-            : Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: _getAisleColor(item['aisle']),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  _getAisleIcon(item['aisle']),
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-        title: Text(
-          item['name'],
-          style: TextStyle(
-            decoration: item['checked'] && _shoppingMode
-                ? TextDecoration.lineThrough
-                : null,
-            color: item['checked'] && _shoppingMode
-                ? Theme.of(context).colorScheme.onSurfaceVariant
-                : null,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.location_on,
-                    size: 14,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant),
-                const SizedBox(width: 4),
-                Text(item['aisle']),
-                const SizedBox(width: 12),
-                Icon(Icons.shopping_bag,
-                    size: 14,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant),
-                const SizedBox(width: 4),
-                Expanded(child: Text(item['quantity'])),
-              ],
-            ),
-            if (item['excess'] != null) ...[
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Excess: ${item['excess']}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Colors.orange,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-            if (item['notes']?.isNotEmpty == true) ...[
-              const SizedBox(height: 2),
-              Text(
-                'Note: ${item['notes']}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ],
-        ),
-        trailing: !_shoppingMode
-            ? PopupMenuButton<String>(
-                onSelected: (value) => _handleItemAction(value, item, category),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: ListTile(
-                      leading: Icon(Icons.edit),
-                      title: Text('Edit'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'move',
-                    child: ListTile(
-                      leading: Icon(Icons.swap_horiz),
-                      title: Text('Move Category'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: ListTile(
-                      leading: Icon(Icons.delete, color: Colors.red),
-                      title:
-                          Text('Delete', style: TextStyle(color: Colors.red)),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                ],
-              )
-            : item['checked']
-                ? const Icon(Icons.check_circle, color: Colors.green)
-                : null,
+        ],
       ),
     );
   }
 
-  // Helper methods
+  // 📦 Category section
+  Widget _buildCategorySection(String title, List<Map<String, dynamic>> items) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              title == 'Pantry Items'
+                  ? Icons.kitchen_outlined
+                  : Icons.shopping_basket_outlined,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...items.map((item) => _buildGroceryTile(item, title)),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  // 🧾 Grocery tile
+  Widget _buildGroceryTile(Map<String, dynamic> item, String category) {
+    final theme = Theme.of(context);
+    return Dismissible(
+      key: ValueKey(item['id']),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: Colors.redAccent,
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => _deleteItem(item, category),
+      child: Card(
+        child: ListTile(
+          leading: _shoppingMode
+              ? Checkbox(
+                  value: item['checked'] ?? false,
+                  onChanged: (v) {
+                    setState(() => item['checked'] = v ?? false);
+                    _saveItem(item);
+                  },
+                )
+              : CircleAvatar(
+                  backgroundColor: _getAisleColor(item['aisle']),
+                  child: Icon(
+                    _getAisleIcon(item['aisle']),
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+          title: Text(
+            item['name'],
+            style: TextStyle(
+              decoration: _shoppingMode && (item['checked'] ?? false)
+                  ? TextDecoration.lineThrough
+                  : null,
+              color: _shoppingMode && (item['checked'] ?? false)
+                  ? Colors.grey
+                  : theme.colorScheme.onSurface,
+            ),
+          ),
+          subtitle: Text('${item['quantity']} • ${item['aisle']}'),
+          trailing: !_shoppingMode
+              ? PopupMenuButton<String>(
+                  onSelected: (v) => _handleItemAction(v, item, category),
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: ListTile(
+                        leading: Icon(Icons.edit),
+                        title: Text('Edit Item'),
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'move',
+                      child: ListTile(
+                        leading: Icon(Icons.swap_horiz),
+                        title: Text('Move Category'),
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: ListTile(
+                        leading: Icon(Icons.delete, color: Colors.red),
+                        title: Text('Delete',
+                            style: TextStyle(color: Colors.red)),
+                      ),
+                    ),
+                  ],
+                )
+              : ((item['checked'] ?? false)
+                  ? const Icon(Icons.check_circle, color: Colors.green)
+                  : null),
+        ),
+      ),
+    );
+  }
+
+  // 🧩 Helpers
+  int _getCheckedCount() =>
+      _groceryItems.values.expand((e) => e).where((i) => i['checked'] == true).length;
+
+  int _getTotalCount() => _groceryItems.values.expand((e) => e).length;
+
   Color _getAisleColor(String aisle) {
     switch (aisle.toLowerCase()) {
       case 'produce':
         return Colors.green;
       case 'meat':
-        return Colors.red;
+        return Colors.redAccent;
       case 'dairy':
         return Colors.blue;
       case 'bakery':
@@ -437,7 +324,7 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
       case 'baking':
         return Colors.purple;
       default:
-        return Theme.of(context).colorScheme.primary;
+        return Colors.grey;
     }
   }
 
@@ -462,36 +349,311 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
     }
   }
 
-  int _getCheckedCount() {
-    return _groceryItems.values
-        .expand((items) => items)
-        .where((item) => item['checked'])
-        .length;
+  // ✏️ Edit Item
+  void _editItem(Map<String, dynamic> item) {
+    final nameCtrl = TextEditingController(text: item['name']);
+    final qtyCtrl = TextEditingController(text: item['quantity']);
+    String aisle = item['aisle'];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Item'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Item Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: qtyCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Quantity',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: aisle,
+                decoration: const InputDecoration(
+                  labelText: 'Aisle',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  'Produce',
+                  'Meat',
+                  'Dairy',
+                  'Bakery',
+                  'Spices',
+                  'Oils',
+                  'Baking',
+                ].map((a) => DropdownMenuItem(value: a, child: Text(a))).toList(),
+                onChanged: (v) => aisle = v!,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                item['name'] = nameCtrl.text;
+                item['quantity'] = qtyCtrl.text;
+                item['aisle'] = aisle;
+              });
+              _saveItem(item);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
-  int _getTotalCount() {
-    return _groceryItems.values.expand((items) => items).length;
+  // ➕ Add Item
+  void _showAddItemDialog() {
+    final nameCtrl = TextEditingController();
+    final qtyCtrl = TextEditingController(text: "1 unit");
+    String aisle = 'Produce';
+    String category = 'To-Buy Items';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: SingleChildScrollView(
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Add Grocery Item',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Item Name',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: qtyCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantity',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: aisle,
+                  decoration: const InputDecoration(
+                    labelText: 'Aisle',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    'Produce',
+                    'Meat',
+                    'Dairy',
+                    'Bakery',
+                    'Spices',
+                    'Oils',
+                    'Baking',
+                  ].map((a) => DropdownMenuItem(value: a, child: Text(a))).toList(),
+                  onChanged: (v) => aisle = v!,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: category,
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _groceryItems.keys
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: (v) => category = v!,
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    if (nameCtrl.text.isEmpty) return;
+                    final newItem = {
+                      'id': '',
+                      'name': nameCtrl.text,
+                      'quantity': qtyCtrl.text,
+                      'aisle': aisle,
+                      'category': category,
+                      'checked': false,
+                    };
+                    setState(() => _groceryItems[category]?.add(newItem));
+                    _saveItem(newItem);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Add Item'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
+  // 🧠 Menu actions remain same
   void _handleMenuAction(String action) {
     switch (action) {
       case 'generate':
-        _showGenerateListDialog();
+        _generateFromCalendar();
         break;
       case 'inventory':
-        _showInventoryDialog();
+        _showInventorySummary();
         break;
       case 'clear':
-        _clearCheckedItems();
+        _confirmClearChecked();
         break;
       case 'share':
-        _shareList();
+        _simulateShare();
         break;
     }
   }
 
-  void _handleItemAction(
-      String action, Map<String, dynamic> item, String category) {
+  void _generateFromCalendar() =>
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Generated grocery list from calendar (demo)'),
+      ));
+
+  void _showInventorySummary() {
+    final total = _groceryItems['Pantry Items']?.length ?? 0;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Pantry Summary'),
+        content: Text('You currently have $total pantry items.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
+  void _confirmClearChecked() {
+    final hasChecked = _getCheckedCount() > 0;
+    if (!hasChecked) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('No checked items to clear.')));
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear Checked Items'),
+        content: const Text('This will permanently remove all checked items.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                for (var cat in _groceryItems.values) {
+                  cat.removeWhere((i) => i['checked'] == true);
+                }
+              });
+              _firestore
+                  .collection('grocery_items')
+                  .where('checked', isEqualTo: true)
+                  .get()
+                  .then((snap) {
+                for (var doc in snap.docs) {
+                  doc.reference.delete();
+                }
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 📤 Share grocery list via share_plus
+  Future<void> _simulateShare() async {
+    final buffer = StringBuffer();
+    buffer.writeln('🛒 My Grocery List\n');
+    _groceryItems.forEach((category, items) {
+      if (items.isNotEmpty) {
+        buffer.writeln('📂 $category');
+        for (var item in items) {
+          final checked = item['checked'] ? '✅' : '⬜';
+          buffer.writeln(
+            '$checked ${item['name']} — ${item['quantity']} (${item['aisle']})',
+          );
+        }
+        buffer.writeln('');
+      }
+    });
+
+    final listText = buffer.toString();
+
+    try {
+      final box = context.findRenderObject() as RenderBox?;
+      await SharePlus.instance.share(
+        ShareParams(
+          text: listText,
+          title: 'My Grocery List',
+          subject: 'My Weekly Grocery List',
+          sharePositionOrigin: box!.localToGlobal(Offset.zero) & box.size,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error sharing list: $e')));
+    }
+  }
+
+  // 🛍 Empty state
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.shopping_bag_outlined,
+              size: 60,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            const Text('No grocery items yet'),
+            const SizedBox(height: 8),
+            const Text('Tap + to start building your list.'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 🛠️ Handle item popup menu actions
+  void _handleItemAction(String action, Map<String, dynamic> item, String category) {
     switch (action) {
       case 'edit':
         _editItem(item);
@@ -503,189 +665,5 @@ class _GroceryListScreenState extends State<GroceryListScreen> {
         _deleteItem(item, category);
         break;
     }
-  }
-
-  void _showGenerateListDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Generate Grocery List'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Select date range from your meal calendar:'),
-            SizedBox(height: 16),
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'Start Date',
-                border: OutlineInputBorder(),
-                suffixIcon: Icon(Icons.calendar_today),
-              ),
-              readOnly: true,
-            ),
-            SizedBox(height: 12),
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'End Date',
-                border: OutlineInputBorder(),
-                suffixIcon: Icon(Icons.calendar_today),
-              ),
-              readOnly: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content:
-                        Text('Calendar integration coming in Milestone 2!')),
-              );
-            },
-            child: const Text('Generate'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showInventoryDialog() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Pantry inventory check coming soon!')),
-    );
-  }
-
-  void _clearCheckedItems() {
-    setState(() {
-      for (var category in _groceryItems.values) {
-        category.removeWhere((item) => item['checked']);
-      }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Checked items cleared')),
-    );
-  }
-
-  void _shareList() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Share functionality coming soon!')),
-    );
-  }
-
-  void _editItem(Map<String, dynamic> item) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Edit item functionality coming soon!')),
-    );
-  }
-
-  void _moveItem(Map<String, dynamic> item, String fromCategory) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Move item functionality coming soon!')),
-    );
-  }
-
-  void _deleteItem(Map<String, dynamic> item, String category) {
-    setState(() {
-      _groceryItems[category]?.remove(item);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${item['name']} deleted')),
-    );
-  }
-
-  void _showAddItemDialog() {
-    final nameController = TextEditingController();
-    String selectedCategory = 'To-Buy Items';
-    String selectedAisle = 'Produce';
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add Grocery Item'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Item Name',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedCategory,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  border: OutlineInputBorder(),
-                ),
-                items: _groceryItems.keys
-                    .map((category) => DropdownMenuItem(
-                        value: category, child: Text(category)))
-                    .toList(),
-                onChanged: (value) {
-                  setDialogState(() => selectedCategory = value!);
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedAisle,
-                decoration: const InputDecoration(
-                  labelText: 'Aisle',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  'Produce',
-                  'Meat',
-                  'Dairy',
-                  'Bakery',
-                  'Spices',
-                  'Oils',
-                  'Baking'
-                ]
-                    .map((aisle) =>
-                        DropdownMenuItem(value: aisle, child: Text(aisle)))
-                    .toList(),
-                onChanged: (value) {
-                  setDialogState(() => selectedAisle = value!);
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (nameController.text.isNotEmpty) {
-                  setState(() {
-                    _groceryItems[selectedCategory]?.add({
-                      'id': '${DateTime.now().millisecondsSinceEpoch}',
-                      'name': nameController.text,
-                      'quantity': '1 item',
-                      'aisle': selectedAisle,
-                      'checked': false,
-                      'notes': '',
-                      'excess': null,
-                    });
-                  });
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

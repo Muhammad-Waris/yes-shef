@@ -542,7 +542,7 @@ class _OCRReviewScreenState extends State<OCRReviewScreen> {
                           width: 16,
                           height: 16,
                           decoration: BoxDecoration(
-                            color: Colors.yellow.withOpacity(0.3),
+                            color: Colors.yellow..withValues(alpha:0.3),
                             border: Border.all(color: Colors.yellow),
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -558,7 +558,7 @@ class _OCRReviewScreenState extends State<OCRReviewScreen> {
                           width: 16,
                           height: 16,
                           decoration: BoxDecoration(
-                            color: Colors.grey.withOpacity(0.3),
+                            color: Colors.grey..withValues(alpha:0.3),
                             border: Border.all(color: Colors.grey),
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -749,12 +749,12 @@ class _OCRReviewScreenState extends State<OCRReviewScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
-          color: isLowConfidence ? Colors.yellow : Colors.grey.withOpacity(0.5),
+          color: isLowConfidence ? Colors.yellow : Colors.grey..withValues(alpha:0.5),
           width: isLowConfidence ? 2 : 1,
         ),
         color: isLowConfidence
-            ? Colors.yellow.withOpacity(0.1)
-            : Colors.grey.withOpacity(0.05),
+            ? Colors.yellow.withValues(alpha:0.1)
+            : Colors.grey..withValues(alpha:0.05),
       ),
       child: TextFormField(
         controller: controller,

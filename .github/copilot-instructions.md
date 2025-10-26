@@ -137,7 +137,7 @@ flutter pub outdated         # Check for newer versions
 
 - **`pubspec.yaml`**: Package manifest with app metadata, dependencies, and Flutter configuration
 - **`analysis_options.yaml`**: Dart analyzer configuration with Flutter lint rules
-- **`android/app/build.gradle.kts`**: Android build configuration (Kotlin DSL, Java 11, namespace: `com.example.yes_chef`)
+- **`android/app/build.gradle.kts`**: Android build configuration (Kotlin DSL, Java 11, namespace: `wd.com.yes_chef`)
 - **`test/widget_test.dart`**: Example widget test for the counter functionality
 
 ## Critical Business Logic Patterns
@@ -327,7 +327,7 @@ lib/
 ## Development Notes
 
 - **Hot Reload**: Fully supported for rapid iteration
-- **Package Name**: Update `com.example.yes_chef` to production package name
+- **Package Name**: Update `wd.com.yes_chef` to production package name
 - **Design System**: Follow Figma prototype closely for UI/UX consistency
 - **Testing Strategy**: Comprehensive widget and integration testing required
 - **Platform Deployment**: App Store and Google Play submission included

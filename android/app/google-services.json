@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1058053201111",
+    "project_id": "yes-chef-8d98a",
+    "storage_bucket": "yes-chef-8d98a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1058053201111:android:a3b8c96375454e0f9e2492",
+        "android_client_info": {
+          "package_name": "wd.com.yes_chef"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC2wUuvZ_UwyAMgcjWj654hNmjaclF30fw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class ManualEntryScreen extends StatefulWidget {
@@ -17,6 +18,8 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
   final _ingredientsController = TextEditingController();
   final _instructionsController = TextEditingController();
 
+  bool _isSaving = false;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -24,7 +27,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
         title: const Text('Enter Recipe Manually'),
         actions: [
           TextButton(
-            onPressed: () => _saveRecipe(),
+            onPressed: _isSaving ? null : _saveRecipe,
             child: const Text('Save'),
           ),
         ],
@@ -36,7 +39,6 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Basic Info Section
               _buildSectionHeader('Basic Information'),
               const SizedBox(height: 12),
 
@@ -65,7 +67,6 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
 
               const SizedBox(height: 16),
 
-              // Timing & Servings
               Row(
                 children: [
                   Expanded(
@@ -96,7 +97,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                     child: TextFormField(
                       controller: _servingsController,
                       decoration: const InputDecoration(
-                        labelText: 'Servings',
+                        labelText: 'Servings *',
                         border: OutlineInputBorder(),
                         hintText: '4',
                       ),
@@ -110,7 +111,6 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
 
               const SizedBox(height: 24),
 
-              // Ingredients Section
               _buildSectionHeader('Ingredients'),
               const SizedBox(height: 12),
 
@@ -130,7 +130,6 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
 
               const SizedBox(height: 24),
 
-              // Instructions Section
               _buildSectionHeader('Instructions'),
               const SizedBox(height: 12),
 
@@ -150,49 +149,22 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
 
               const SizedBox(height: 32),
 
-              // Save Button
               SizedBox(
                 height: 50,
                 child: ElevatedButton.icon(
-                  onPressed: () => _saveRecipe(),
-                  icon: const Icon(Icons.save),
-                  label: const Text('Save Recipe'),
+                  onPressed: _isSaving ? null : _saveRecipe,
+                  icon: _isSaving
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: Text(_isSaving ? 'Saving...' : 'Save Recipe'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Coming Soon Notice
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                ),
-                child: Column(
-                  children: [
-                    const Icon(Icons.construction,
-                        color: Colors.orange, size: 24),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Manual Entry - Milestone 2',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Full manual entry with auto-tagging coming soon!',
-                      style: TextStyle(color: Colors.orange, fontSize: 12),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
                 ),
               ),
             ],
@@ -205,22 +177,78 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+      style: Theme.of(context)
+          .textTheme
+          .titleLarge
+          ?.copyWith(fontWeight: FontWeight.bold),
     );
   }
 
-  void _saveRecipe() {
-    if (_formKey.currentState?.validate() == true) {
-      // Show success message
+  Future<void> _saveRecipe() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final ingredients = _ingredientsController.text
+          .split('\n')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+
+      final instructions = _instructionsController.text
+          .split('\n')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+
+      await FirebaseFirestore.instance.collection('recipes').add({
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'ingredients':
+            ingredients.map((e) => {'name': e, 'isProminent': false}).toList(),
+        'instructions': instructions,
+        'prepTime': int.tryParse(_prepTimeController.text) ?? 0,
+        'cookTime': int.tryParse(_cookTimeController.text) ?? 0,
+        'servings': int.tryParse(_servingsController.text) ?? 1,
+        'isCooked': false,
+        'isFavorite': false,
+        'rating': null,
+        'mealTypeTags': [],
+        'dietTypeTags': [],
+        'supplementalTags': [],
+        'allTags': [],
+        'image': null,
+        'sourceUrl': null,
+        'cookbookTitle': null,
+        'cookbookAuthor': null,
+        'dateAdded': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Recipe saved successfully!')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text('Manual recipe entry will be implemented in Milestone 2!'),
-          duration: Duration(seconds: 3),
-        ),
+        SnackBar(content: Text('Error saving recipe: $e')),
       );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _prepTimeController.dispose();
+    _cookTimeController.dispose();
+    _servingsController.dispose();
+    _ingredientsController.dispose();
+    _instructionsController.dispose();
+    super.dispose();
   }
 }
